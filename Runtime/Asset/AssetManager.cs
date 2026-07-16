@@ -37,6 +37,11 @@ namespace GameFrameX.Asset.Runtime
         /// </summary>
         public long Milliseconds { get; set; }
 
+        private ResourcePackage GetDefaultResourcePackage()
+        {
+            return YooAssets.GetPackage(DefaultPackageName);
+        }
+
         /// <summary>
         /// 初始化
         /// </summary>
@@ -46,7 +51,7 @@ namespace GameFrameX.Asset.Runtime
         {
             Log.Info($"资源系统运行模式：{PlayMode}");
             YooAssets.Initialize();
-            YooAssets.SetOperationSystemMaxTimeSlice(Milliseconds > 0 ? Milliseconds : 30);
+            YooAssets.SetAsyncOperationMaxTimeSlice(Milliseconds > 0 ? Milliseconds : 30);
             // YooAssets.SetCacheSystemCachedFileVerifyLevel(EVerifyLevel.High);
             // YooAssets.SetDownloadSystemBreakpointResumeFileSize(4096 * 8);
 
@@ -71,21 +76,23 @@ namespace GameFrameX.Asset.Runtime
             GameFrameworkGuard.NotNull(fallbackHostServerURL, nameof(fallbackHostServerURL));
 
             // 创建默认的资源包
-            var resourcePackage = YooAssets.TryGetPackage(packageName);
+            YooAssets.TryGetPackage(packageName, out var resourcePackage);
             if (resourcePackage == null)
             {
                 resourcePackage = YooAssets.CreatePackage(packageName);
-                if (isDefaultPackage)
-                {
-                    // 设置该资源包为默认的资源包，可以使用YooAssets相关加载接口加载该资源包内容。
-                    YooAssets.SetDefaultPackage(resourcePackage);
-                }
+            }
+
+            if (isDefaultPackage)
+            {
+                DefaultPackageName = packageName;
+                // 设置该资源包为默认的资源包，可以使用YooAssets相关加载接口加载该资源包内容。
+                YooAssets.SetDefaultPackage(resourcePackage);
             }
 
             var initializationOperationHandler = CreateInitializationOperationHandler(resourcePackage, hostServerURL, fallbackHostServerURL);
             initializationOperationHandler.Completed += asyncOperationBase =>
             {
-                if (asyncOperationBase.Error == null && asyncOperationBase.Status == EOperationStatus.Succeed && asyncOperationBase.IsDone)
+                if (asyncOperationBase.Error == null && asyncOperationBase.Status == EOperationStatus.Succeeded && asyncOperationBase.IsDone)
                 {
                     taskCompletionSource.TrySetResult(true);
                 }
@@ -178,7 +185,7 @@ namespace GameFrameX.Asset.Runtime
             if (package != null)
             {
                 package.UnloadAllAssetsAsync();
-                package.ClearUnusedBundleFilesAsync();
+                package.ClearCacheAsync(new ClearCacheOptions(ClearCacheMethods.ClearAllBundleFiles));
             }
         }
 
@@ -197,7 +204,7 @@ namespace GameFrameX.Asset.Runtime
             var package = YooAssets.GetPackage(packageName);
             if (package != null)
             {
-                package.ClearUnusedBundleFilesAsync();
+                package.ClearCacheAsync(new ClearCacheOptions(ClearCacheMethods.ClearUnusedBundleFiles));
             }
         }
 
@@ -213,7 +220,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<SubAssetsHandle> LoadSubAssetsAsync(AssetInfo assetInfo)
         {
             var taskCompletionSource = new TaskCompletionSource<SubAssetsHandle>();
-            var assetHandle = YooAssets.LoadSubAssetsAsync(assetInfo);
+            var assetHandle = GetDefaultResourcePackage().LoadSubAssetsAsync(assetInfo);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -228,7 +235,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<SubAssetsHandle> LoadSubAssetsAsync(string path, Type type)
         {
             var taskCompletionSource = new TaskCompletionSource<SubAssetsHandle>();
-            var assetHandle = YooAssets.LoadSubAssetsAsync(path, type);
+            var assetHandle = GetDefaultResourcePackage().LoadSubAssetsAsync(path, type);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -242,7 +249,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<SubAssetsHandle> LoadSubAssetsAsync<T>(string path) where T : Object
         {
             var taskCompletionSource = new TaskCompletionSource<SubAssetsHandle>();
-            var assetHandle = YooAssets.LoadSubAssetsAsync<T>(path);
+            var assetHandle = GetDefaultResourcePackage().LoadSubAssetsAsync<T>(path);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -259,7 +266,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public SubAssetsHandle LoadSubAssetSync(AssetInfo assetInfo)
         {
-            return YooAssets.LoadSubAssetsSync(assetInfo);
+            return GetDefaultResourcePackage().LoadSubAssetsSync(assetInfo);
         }
 
         /// <summary>
@@ -271,7 +278,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public SubAssetsHandle LoadSubAssetSync(string path, Type type)
         {
-            return YooAssets.LoadSubAssetsSync(path, type);
+            return GetDefaultResourcePackage().LoadSubAssetsSync(path, type);
         }
 
         /// <summary>
@@ -282,7 +289,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public SubAssetsHandle LoadSubAssetSync<T>(string path) where T : Object
         {
-            return YooAssets.LoadSubAssetsSync<T>(path);
+            return GetDefaultResourcePackage().LoadSubAssetsSync<T>(path);
         }
 
         #endregion
@@ -295,10 +302,10 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="assetInfo">资源信息</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        public Task<RawFileHandle> LoadRawFileAsync(AssetInfo assetInfo)
+        public Task<AssetHandle> LoadRawFileAsync(AssetInfo assetInfo)
         {
-            var taskCompletionSource = new TaskCompletionSource<RawFileHandle>();
-            var assetHandle = YooAssets.LoadRawFileAsync(assetInfo);
+            var taskCompletionSource = new TaskCompletionSource<AssetHandle>();
+            var assetHandle = GetDefaultResourcePackage().LoadAssetAsync(assetInfo);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -309,10 +316,10 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="path">资源路径</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        public Task<RawFileHandle> LoadRawFileAsync(string path)
+        public Task<AssetHandle> LoadRawFileAsync(string path)
         {
-            var taskCompletionSource = new TaskCompletionSource<RawFileHandle>();
-            var assetHandle = YooAssets.LoadRawFileAsync(path);
+            var taskCompletionSource = new TaskCompletionSource<AssetHandle>();
+            var assetHandle = GetDefaultResourcePackage().LoadAssetAsync<RawFileObject>(path);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -327,9 +334,9 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="assetInfo">资源信息</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        public RawFileHandle LoadRawFileSync(AssetInfo assetInfo)
+        public AssetHandle LoadRawFileSync(AssetInfo assetInfo)
         {
-            return YooAssets.LoadRawFileSync(assetInfo);
+            return GetDefaultResourcePackage().LoadAssetSync(assetInfo);
         }
 
         /// <summary>
@@ -338,9 +345,9 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="path">资源路径</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        public RawFileHandle LoadRawFileSync(string path)
+        public AssetHandle LoadRawFileSync(string path)
         {
-            return YooAssets.LoadRawFileSync(path);
+            return GetDefaultResourcePackage().LoadAssetSync<RawFileObject>(path);
         }
 
         #endregion
@@ -357,7 +364,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AssetHandle> LoadAssetAsync(AssetInfo assetInfo)
         {
             var taskCompletionSource = new TaskCompletionSource<AssetHandle>();
-            var assetHandle = YooAssets.LoadAssetAsync(assetInfo);
+            var assetHandle = GetDefaultResourcePackage().LoadAssetAsync(assetInfo);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -372,7 +379,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AssetHandle> LoadAssetAsync(string path, Type type)
         {
             var taskCompletionSource = new TaskCompletionSource<AssetHandle>();
-            var assetHandle = YooAssets.LoadAssetAsync(path, type);
+            var assetHandle = GetDefaultResourcePackage().LoadAssetAsync(path, type);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -386,7 +393,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AllAssetsHandle> LoadAllAssetsAsync<T>(string path) where T : Object
         {
             var taskCompletionSource = new TaskCompletionSource<AllAssetsHandle>();
-            var assetHandle = YooAssets.LoadAllAssetsAsync<T>(path);
+            var assetHandle = GetDefaultResourcePackage().LoadAllAssetsAsync<T>(path);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -401,7 +408,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AllAssetsHandle> LoadAllAssetsAsync(string path, Type type)
         {
             var taskCompletionSource = new TaskCompletionSource<AllAssetsHandle>();
-            var assetHandle = YooAssets.LoadAllAssetsAsync(path, type);
+            var assetHandle = GetDefaultResourcePackage().LoadAllAssetsAsync(path, type);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -414,7 +421,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AllAssetsHandle> LoadAllAssetsAsync(string path)
         {
             var taskCompletionSource = new TaskCompletionSource<AllAssetsHandle>();
-            var assetHandle = YooAssets.LoadAllAssetsAsync(path);
+            var assetHandle = GetDefaultResourcePackage().LoadAllAssetsAsync(path);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -427,7 +434,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AllAssetsHandle> LoadAllAssetsAsync(AssetInfo assetInfo)
         {
             var taskCompletionSource = new TaskCompletionSource<AllAssetsHandle>();
-            var assetHandle = YooAssets.LoadAllAssetsAsync(assetInfo);
+            var assetHandle = GetDefaultResourcePackage().LoadAllAssetsAsync(assetInfo);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -439,7 +446,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public SubAssetsHandle LoadSubAssetsAsync(string path)
         {
-            return YooAssets.LoadSubAssetsAsync(path);
+            return GetDefaultResourcePackage().LoadSubAssetsAsync(path);
         }
 
 
@@ -452,7 +459,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AssetHandle> LoadAssetAsync(string path)
         {
             var taskCompletionSource = new TaskCompletionSource<AssetHandle>();
-            var assetHandle = YooAssets.LoadAssetAsync(path);
+            var assetHandle = GetDefaultResourcePackage().LoadAssetAsync(path);
             assetHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -467,7 +474,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<AssetHandle> LoadAssetAsync<T>(string path) where T : Object
         {
             var taskCompletionSource = new TaskCompletionSource<AssetHandle>();
-            var assetHandle = YooAssets.LoadAssetAsync<T>(path);
+            var assetHandle = GetDefaultResourcePackage().LoadAssetAsync<T>(path);
 
             void OnAssetHandleOnCompleted(AssetHandle handle)
             {
@@ -489,7 +496,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AllAssetsHandle LoadAllAssetsSync(string path)
         {
-            return YooAssets.LoadAllAssetsSync(path);
+            return GetDefaultResourcePackage().LoadAllAssetsSync(path);
         }
 
         /// <summary>
@@ -500,7 +507,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AllAssetsHandle LoadAllAssetsSync<T>(string path) where T : Object
         {
-            return YooAssets.LoadAllAssetsSync<T>(path);
+            return GetDefaultResourcePackage().LoadAllAssetsSync<T>(path);
         }
 
         /// <summary>
@@ -511,7 +518,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AllAssetsHandle LoadAllAssetsSync(string path, Type type)
         {
-            return YooAssets.LoadAllAssetsSync(path, type);
+            return GetDefaultResourcePackage().LoadAllAssetsSync(path, type);
         }
 
         /// <summary>
@@ -522,7 +529,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AllAssetsHandle LoadAllAssetsSync(AssetInfo assetInfo)
         {
-            return YooAssets.LoadAllAssetsSync(assetInfo);
+            return GetDefaultResourcePackage().LoadAllAssetsSync(assetInfo);
         }
 
         /// <summary>
@@ -533,7 +540,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public SubAssetsHandle LoadSubAssetSync(string path)
         {
-            return YooAssets.LoadSubAssetsSync(path);
+            return GetDefaultResourcePackage().LoadSubAssetsSync(path);
         }
 
         /// <summary>
@@ -544,7 +551,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AssetHandle LoadAssetSync(string path)
         {
-            return YooAssets.LoadAssetSync(path);
+            return GetDefaultResourcePackage().LoadAssetSync(path);
         }
 
         /// <summary>
@@ -556,7 +563,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AssetHandle LoadAssetSync(string path, Type type)
         {
-            return YooAssets.LoadAssetSync(path, type);
+            return GetDefaultResourcePackage().LoadAssetSync(path, type);
         }
 
         /// <summary>
@@ -567,7 +574,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AssetHandle LoadAssetSync(AssetInfo assetInfo)
         {
-            return YooAssets.LoadAssetSync(assetInfo);
+            return GetDefaultResourcePackage().LoadAssetSync(assetInfo);
         }
 
         /// <summary>
@@ -578,7 +585,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AssetHandle LoadAssetSync<T>(string path) where T : Object
         {
-            return YooAssets.LoadAssetSync<T>(path);
+            return GetDefaultResourcePackage().LoadAssetSync<T>(path);
         }
 
         #endregion
@@ -596,7 +603,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<SceneHandle> LoadSceneAsync(string path, UnityEngine.SceneManagement.LoadSceneMode sceneMode, bool activateOnLoad = true)
         {
             var taskCompletionSource = new TaskCompletionSource<SceneHandle>();
-            var sceneHandle = YooAssets.LoadSceneAsync(path, sceneMode, UnityEngine.SceneManagement.LocalPhysicsMode.None, !activateOnLoad);
+            var sceneHandle = GetDefaultResourcePackage().LoadSceneAsync(path, sceneMode, UnityEngine.SceneManagement.LocalPhysicsMode.None, activateOnLoad);
             sceneHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -612,7 +619,7 @@ namespace GameFrameX.Asset.Runtime
         public Task<SceneHandle> LoadSceneAsync(AssetInfo assetInfo, UnityEngine.SceneManagement.LoadSceneMode sceneMode, bool activateOnLoad = true)
         {
             var taskCompletionSource = new TaskCompletionSource<SceneHandle>();
-            var sceneHandle = YooAssets.LoadSceneAsync(assetInfo, sceneMode, UnityEngine.SceneManagement.LocalPhysicsMode.None, !activateOnLoad);
+            var sceneHandle = GetDefaultResourcePackage().LoadSceneAsync(assetInfo, sceneMode, UnityEngine.SceneManagement.LocalPhysicsMode.None, activateOnLoad);
             sceneHandle.Completed += handle => { taskCompletionSource.TrySetResult(handle); };
             return taskCompletionSource.Task;
         }
@@ -640,7 +647,8 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public ResourcePackage TryGetAssetsPackage(string packageName)
         {
-            return YooAssets.TryGetPackage(packageName);
+            YooAssets.TryGetPackage(packageName, out var resourcePackage);
+            return resourcePackage;
         }
 
         /// <summary>
@@ -651,7 +659,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public bool HasAssetsPackage(string packageName)
         {
-            return YooAssets.TryGetPackage(packageName) != null;
+            return YooAssets.ContainsPackage(packageName);
         }
 
         /// <summary>
@@ -675,7 +683,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public bool IsNeedDownload(AssetInfo assetInfo)
         {
-            return YooAssets.IsNeedDownloadFromRemote(assetInfo);
+            return GetDefaultResourcePackage().GetDownloadSize(assetInfo) > 0;
         }
 
         /// <summary>
@@ -686,7 +694,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public bool IsNeedDownload(string path)
         {
-            return YooAssets.IsNeedDownloadFromRemote(path);
+            return GetDefaultResourcePackage().GetDownloadSize(path) > 0;
         }
 
         /// <summary>
@@ -697,7 +705,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AssetInfo[] GetAssetInfos(string[] assetTags)
         {
-            return YooAssets.GetAssetInfos(assetTags);
+            return GetDefaultResourcePackage().GetAssetInfos(assetTags);
         }
 
         /// <summary>
@@ -708,7 +716,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AssetInfo[] GetAssetInfos(string assetTag)
         {
-            return YooAssets.GetAssetInfos(assetTag);
+            return GetDefaultResourcePackage().GetAssetInfos(assetTag);
         }
 
         /// <summary>
@@ -717,7 +725,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public AssetInfo GetAssetInfo(string path)
         {
-            return YooAssets.GetAssetInfo(path);
+            return GetDefaultResourcePackage().GetAssetInfo(path);
         }
 
         /// <summary>
@@ -728,7 +736,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public bool HasAssetPath(string path)
         {
-            return YooAssets.CheckLocationValid(path);
+            return GetDefaultResourcePackage().IsLocationValid(path);
         }
 
         /// <summary>
@@ -739,6 +747,7 @@ namespace GameFrameX.Asset.Runtime
         [UnityEngine.Scripting.Preserve]
         public void SetDefaultAssetsPackage(ResourcePackage resourcePackage)
         {
+            DefaultPackageName = resourcePackage.PackageName;
             YooAssets.SetDefaultPackage(resourcePackage);
         }
 

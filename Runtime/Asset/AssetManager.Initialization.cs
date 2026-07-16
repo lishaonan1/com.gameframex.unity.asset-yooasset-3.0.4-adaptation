@@ -1,7 +1,4 @@
 using System;
-using System.IO;
-using GameFrameX.Runtime;
-using UnityEngine;
 using YooAsset;
 
 namespace GameFrameX.Asset.Runtime
@@ -11,156 +8,84 @@ namespace GameFrameX.Asset.Runtime
         public const string ConstDefaultPackageName = "DefaultPackage";
 
         /// <summary>
-        /// 根据运行模式创建初始化操作数据
+        /// 根据运行模式创建 YooAsset 3.x 初始化操作。
         /// </summary>
-        /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        private InitializationOperation CreateInitializationOperationHandler(ResourcePackage resourcePackage, string hostServerURL, string fallbackHostServerURL)
+        private InitializePackageOperation CreateInitializationOperationHandler(ResourcePackage resourcePackage, string hostServerURL, string fallbackHostServerURL)
         {
             switch (PlayMode)
             {
                 case EPlayMode.EditorSimulateMode:
-                {
-                    // 编辑器下的模拟模式
                     return InitializeYooAssetEditorSimulateMode(resourcePackage);
-                }
+
                 case EPlayMode.OfflinePlayMode:
-                {
-                    // 单机运行模式
                     return InitializeYooAssetOfflinePlayMode(resourcePackage);
-                }
+
                 case EPlayMode.HostPlayMode:
-                {
-                    // 联机运行模式
                     return InitializeYooAssetHostPlayMode(resourcePackage, hostServerURL, fallbackHostServerURL);
-                }
+
                 case EPlayMode.WebPlayMode:
-                {
-                    // WebGL运行模式
                     return InitializeYooAssetWebPlayMode(resourcePackage, hostServerURL, fallbackHostServerURL);
-                }
+
                 default:
-                {
                     throw new ArgumentOutOfRangeException(nameof(PlayMode), PlayMode, $"Unsupported play mode: {PlayMode}");
-                }
             }
         }
 
         /// <summary>
-        /// 初始化YooAsset编辑器模拟运行模式
+        /// 初始化 YooAsset 编辑器模拟运行模式。
         /// </summary>
-        /// <param name="resourcePackage">资源包</param>
-        /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        private InitializationOperation InitializeYooAssetEditorSimulateMode(ResourcePackage resourcePackage)
+        private InitializePackageOperation InitializeYooAssetEditorSimulateMode(ResourcePackage resourcePackage)
         {
-            var simulateBuildResult = EditorSimulateModeHelper.SimulateBuild(nameof(EDefaultBuildPipeline.BuiltinBuildPipeline), ConstDefaultPackageName);
-            var createParameters = new EditorSimulateModeParameters();
-            createParameters.EditorFileSystemParameters = FileSystemParameters.CreateDefaultEditorFileSystemParameters(simulateBuildResult);
-            return resourcePackage.InitializeAsync(createParameters);
+            var simulateBuildResult = EditorSimulateBuildInvoker.Build(resourcePackage.PackageName, (int)EBundleType.VirtualAssetBundle);
+            var options = new EditorSimulateModeOptions
+            {
+                EditorFileSystemParameters = FileSystemParameters.CreateDefaultEditorFileSystemParameters(simulateBuildResult.PackageRootDirectory)
+            };
+            return resourcePackage.InitializePackageAsync(options);
         }
 
         /// <summary>
-        /// 初始化YooAsset单机运行模式
+        /// 初始化 YooAsset 单机运行模式。
         /// </summary>
-        /// <param name="resourcePackage">资源包</param>
-        /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        private InitializationOperation InitializeYooAssetOfflinePlayMode(ResourcePackage resourcePackage)
+        private InitializePackageOperation InitializeYooAssetOfflinePlayMode(ResourcePackage resourcePackage)
         {
-            var buildinFileSystem = FileSystemParameters.CreateDefaultBuildinFileSystemParameters();
-            var initParameters = new OfflinePlayModeParameters();
-            initParameters.BuildinFileSystemParameters = buildinFileSystem;
-            return resourcePackage.InitializeAsync(initParameters);
+            var options = new OfflinePlayModeOptions
+            {
+                BuiltinFileSystemParameters = FileSystemParameters.CreateDefaultBuiltinFileSystemParameters()
+            };
+            return resourcePackage.InitializePackageAsync(options);
         }
 
         /// <summary>
-        /// 初始化YooAsset WebGL运行模式
+        /// 初始化 YooAsset WebGL 运行模式。
         /// </summary>
-        /// <param name="resourcePackage">资源包</param>
-        /// <param name="hostServerURL">主机服务器URL</param>
-        /// <param name="fallbackHostServerURL">备用主机服务器URL</param>
-        /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        private InitializationOperation InitializeYooAssetWebPlayMode(ResourcePackage resourcePackage, string hostServerURL, string fallbackHostServerURL)
-        {
-            var initParameters = new WebPlayModeParameters();
-            FileSystemParameters webFileSystem = null;
-#if UNITY_WEBGL
-#if ENABLE_DOUYIN_MINI_GAME
-            // https://developer.open-douyin.com/docs/resource/zh-CN/mini-game/develop/guide/performance-optimization-both/unity/startup/use-predownload-feature#ac640a2e
-            TTSDK.TT.PreloadConcurrent(10);
-            // 强行控制并发数量
-            GameEntry.GetComponent<AssetComponent>().gameObject.GetOrAddComponent<DouYinConfigHandler>();
-            // 创建字节小游戏文件系统
-            // https: //www.yooasset.com/docs/MiniGame#%E6%8A%96%E9%9F%B3%E5%B0%8F%E6%B8%B8%E6%88%8F
-            if (hostServerURL.IsNullOrWhiteSpace())
-            {
-                webFileSystem = ByteGameFileSystemCreater.CreateByteGameFileSystemParameters();
-            }
-            else
-            {
-                webFileSystem = ByteGameFileSystemCreater.CreateByteGameFileSystemParameters(hostServerURL);
-            }
-#elif ENABLE_WECHAT_MINI_GAME
-            //https://www.yooasset.com/docs/MiniGame#%E5%BE%AE%E4%BF%A1%E5%B0%8F%E6%B8%B8%E6%88%8F
-            WeChatWASM.WXBase.PreloadConcurrent(10);
-            // 强行控制并发数量
-            GameEntry.GetComponent<AssetComponent>().gameObject.GetOrAddComponent<WeChatConfigHandler>();
-            string packageRoot = $"{WeChatWASM.WXBase.env.USER_DATA_PATH}/__GAME_FILE_CACHE/{YooAssetSettingsData.Setting.DefaultYooFolderName}";
-            // 创建微信小游戏文件系统
-            if (hostServerURL.IsNullOrWhiteSpace())
-            {
-                webFileSystem = WechatFileSystemCreater.CreateWechatFileSystemParameters();
-            }
-            else
-            {
-                webFileSystem = WechatFileSystemCreater.CreateWechatPathFileSystemParameters(hostServerURL);
-            }
-#elif ENABLE_KUAISHOU_MINI_GAME
-            // https://open.kuaishou.com/miniGameDocs/gameDev/Unity/Launchability/AssetBundle.html
-#if !UNITY_EDITOR
-            KSWASM.KSBase.PreloadConcurrent(10);
-#endif
-            // 强行控制并发数量
-            GameEntry.GetComponent<AssetComponent>().gameObject.GetOrAddComponent<KuaiShouConfigHandler>();
-            // string packageRoot = $"{KSWASM.KSBase.env.USER_DATA_PATH}/__GAME_FILE_CACHE/{YooAssetSettingsData.Setting.DefaultYooFolderName}";
-            // 创建快手小游戏文件系统
-            if (hostServerURL.IsNullOrWhiteSpace())
-            {
-                webFileSystem = KuaiShouFileSystemCreater.CreateKuaiShouFileSystemParameters();
-            }
-            else
-            {
-                webFileSystem = KuaiShouFileSystemCreater.CreateKuaiShouPathFileSystemParameters(hostServerURL);
-            }
-#else
-            // 创建默认WebGL文件系统
-            webFileSystem = FileSystemParameters.CreateDefaultWebFileSystemParameters();
-#endif
-#else
-            webFileSystem = FileSystemParameters.CreateDefaultWebFileSystemParameters();
-#endif
-            initParameters.WebFileSystemParameters = webFileSystem;
-            return resourcePackage.InitializeAsync(initParameters);
-        }
-
-        /// <summary>
-        /// 初始化YooAsset热更新运行模式
-        /// </summary>
-        /// <param name="resourcePackage">资源包</param>
-        /// <param name="hostServerURL">主机服务器URL</param>
-        /// <param name="fallbackHostServerURL">备用主机服务器URL</param>
-        /// <returns></returns>
-        private InitializationOperation InitializeYooAssetHostPlayMode(ResourcePackage resourcePackage, string hostServerURL, string fallbackHostServerURL)
+        private InitializePackageOperation InitializeYooAssetWebPlayMode(ResourcePackage resourcePackage, string hostServerURL, string fallbackHostServerURL)
         {
             var remoteServices = new RemoteServices(hostServerURL, fallbackHostServerURL);
-            var createParameters = new HostPlayModeParameters
+            var options = new WebPlayModeOptions
             {
-                BuildinFileSystemParameters = FileSystemParameters.CreateDefaultBuildinFileSystemParameters(),
-                CacheFileSystemParameters = FileSystemParameters.CreateDefaultCacheFileSystemParameters(remoteServices),
+                WebServerFileSystemParameters = FileSystemParameters.CreateDefaultWebServerFileSystemParameters(),
+                WebNetworkFileSystemParameters = FileSystemParameters.CreateDefaultWebNetworkFileSystemParameters(remoteServices)
             };
-            return resourcePackage.InitializeAsync(createParameters);
+            return resourcePackage.InitializePackageAsync(options);
+        }
+
+        /// <summary>
+        /// 初始化 YooAsset 热更新运行模式。
+        /// </summary>
+        private InitializePackageOperation InitializeYooAssetHostPlayMode(ResourcePackage resourcePackage, string hostServerURL, string fallbackHostServerURL)
+        {
+            var remoteServices = new RemoteServices(hostServerURL, fallbackHostServerURL);
+            var options = new HostPlayModeOptions
+            {
+                BuiltinFileSystemParameters = FileSystemParameters.CreateDefaultBuiltinFileSystemParameters(),
+                CacheFileSystemParameters = FileSystemParameters.CreateDefaultSandboxFileSystemParameters(remoteServices)
+            };
+            return resourcePackage.InitializePackageAsync(options);
         }
     }
 }

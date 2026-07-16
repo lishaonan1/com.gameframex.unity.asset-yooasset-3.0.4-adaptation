@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using YooAsset;
 
 namespace GameFrameX.Asset.Runtime
@@ -6,11 +6,10 @@ namespace GameFrameX.Asset.Runtime
     public partial class AssetManager
     {
         [UnityEngine.Scripting.Preserve]
-        private class RemoteServices : IRemoteServices
+        private class RemoteServices : IRemoteService
         {
             [UnityEngine.Scripting.Preserve] public string HostServer { get; }
             [UnityEngine.Scripting.Preserve] public string FallbackHostServer { get; }
-            private readonly ConcurrentDictionary<string, string> _mapping = new ConcurrentDictionary<string, string>();
 
             [UnityEngine.Scripting.Preserve]
             public RemoteServices(string hostServer, string fallbackHostServer)
@@ -20,21 +19,18 @@ namespace GameFrameX.Asset.Runtime
             }
 
             [UnityEngine.Scripting.Preserve]
-            public string GetRemoteMainURL(string fileName, string packageVersion)
+            public IReadOnlyList<string> GetRemoteUrls(string fileName)
             {
-                return GetFileLoadURL(fileName);
-            }
+                var urls = new List<string>(2)
+                {
+                    PathUtility.Combine(HostServer, fileName)
+                };
+                if (string.Equals(HostServer, FallbackHostServer) == false)
+                {
+                    urls.Add(PathUtility.Combine(FallbackHostServer, fileName));
+                }
 
-            [UnityEngine.Scripting.Preserve]
-            public string GetRemoteFallbackURL(string fileName, string packageVersion)
-            {
-                return GetFileLoadURL(fileName, true);
-            }
-
-            [UnityEngine.Scripting.Preserve]
-            private string GetFileLoadURL(string fileName, bool isFallback = false)
-            {
-                return _mapping.GetOrAdd(fileName, _ => PathUtility.Combine(isFallback ? FallbackHostServer : HostServer, fileName));
+                return urls;
             }
         }
     }

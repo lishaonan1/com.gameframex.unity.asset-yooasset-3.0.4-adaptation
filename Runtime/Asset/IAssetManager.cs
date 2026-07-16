@@ -144,7 +144,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="assetInfo">资源信息</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        Task<RawFileHandle> LoadRawFileAsync(AssetInfo assetInfo);
+        Task<AssetHandle> LoadRawFileAsync(AssetInfo assetInfo);
 
         /// <summary>
         /// 异步加载原生文件
@@ -152,7 +152,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="path">资源路径</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        Task<RawFileHandle> LoadRawFileAsync(string path);
+        Task<AssetHandle> LoadRawFileAsync(string path);
 
         #endregion
 
@@ -164,7 +164,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="assetInfo">资源信息</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        RawFileHandle LoadRawFileSync(AssetInfo assetInfo);
+        AssetHandle LoadRawFileSync(AssetInfo assetInfo);
 
         /// <summary>
         /// 同步加载原生文件
@@ -172,7 +172,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="path">资源路径</param>
         /// <returns></returns>
         [UnityEngine.Scripting.Preserve]
-        RawFileHandle LoadRawFileSync(string path);
+        AssetHandle LoadRawFileSync(string path);
 
         #endregion
 

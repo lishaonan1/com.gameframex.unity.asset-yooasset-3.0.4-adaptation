@@ -55,7 +55,6 @@ namespace GameFrameX.Asset.Runtime
         /// </remarks>
         /// <value>内置资源包名称 / Built-in package name</value>
         public const string BuildInPackageName = "DefaultPackage";
-        private InitializationOperation _initializationOperation;
 
         private IAssetManager _assetManager;
 
@@ -226,7 +225,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="assetInfo">资源信息 / Asset information</param>
         /// <returns>原生文件操作句柄的异步任务 / Async task of the raw file handle</returns>
         [UnityEngine.Scripting.Preserve]
-        public Task<RawFileHandle> LoadRawFileAsync(AssetInfo assetInfo)
+        public Task<AssetHandle> LoadRawFileAsync(AssetInfo assetInfo)
         {
             return _assetManager.LoadRawFileAsync(assetInfo);
         }
@@ -240,7 +239,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="path">资源路径 / Asset path</param>
         /// <returns>原生文件操作句柄的异步任务 / Async task of the raw file handle</returns>
         [UnityEngine.Scripting.Preserve]
-        public Task<RawFileHandle> LoadRawFileAsync(string path)
+        public Task<AssetHandle> LoadRawFileAsync(string path)
         {
             return _assetManager.LoadRawFileAsync(path);
         }
@@ -258,7 +257,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="assetInfo">资源信息 / Asset information</param>
         /// <returns>原生文件操作句柄 / Raw file handle</returns>
         [UnityEngine.Scripting.Preserve]
-        public RawFileHandle LoadRawFileSync(AssetInfo assetInfo)
+        public AssetHandle LoadRawFileSync(AssetInfo assetInfo)
         {
             return _assetManager.LoadRawFileSync(assetInfo);
         }
@@ -272,7 +271,7 @@ namespace GameFrameX.Asset.Runtime
         /// <param name="path">资源路径 / Asset path</param>
         /// <returns>原生文件操作句柄 / Raw file handle</returns>
         [UnityEngine.Scripting.Preserve]
-        public RawFileHandle LoadRawFileSync(string path)
+        public AssetHandle LoadRawFileSync(string path)
         {
             return _assetManager.LoadRawFileSync(path);
         }
