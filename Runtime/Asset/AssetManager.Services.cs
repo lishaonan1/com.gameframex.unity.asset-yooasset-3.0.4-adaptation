@@ -23,14 +23,29 @@ namespace GameFrameX.Asset.Runtime
             {
                 var urls = new List<string>(2)
                 {
-                    PathUtility.Combine(HostServer, fileName)
+                    CombineRemoteUrl(HostServer, fileName)
                 };
                 if (string.Equals(HostServer, FallbackHostServer) == false)
                 {
-                    urls.Add(PathUtility.Combine(FallbackHostServer, fileName));
+                    urls.Add(CombineRemoteUrl(FallbackHostServer, fileName));
                 }
 
                 return urls;
+            }
+
+            private static string CombineRemoteUrl(string hostServer, string fileName)
+            {
+                if (string.IsNullOrEmpty(hostServer))
+                {
+                    return fileName ?? string.Empty;
+                }
+
+                if (string.IsNullOrEmpty(fileName))
+                {
+                    return hostServer;
+                }
+
+                return $"{hostServer.TrimEnd('/')}/{fileName.TrimStart('/')}";
             }
         }
     }
