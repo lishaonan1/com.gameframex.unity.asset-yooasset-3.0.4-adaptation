@@ -85,8 +85,6 @@ namespace GameFrameX.Asset.Runtime
             if (isDefaultPackage)
             {
                 DefaultPackageName = packageName;
-                // 设置该资源包为默认的资源包，可以使用YooAssets相关加载接口加载该资源包内容。
-                YooAssets.SetDefaultPackage(resourcePackage);
             }
 
             var initializationOperationHandler = CreateInitializationOperationHandler(resourcePackage, hostServerURL, fallbackHostServerURL);
@@ -748,7 +746,6 @@ namespace GameFrameX.Asset.Runtime
         public void SetDefaultAssetsPackage(ResourcePackage resourcePackage)
         {
             DefaultPackageName = resourcePackage.PackageName;
-            YooAssets.SetDefaultPackage(resourcePackage);
         }
 
 
